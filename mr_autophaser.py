@@ -3,10 +3,10 @@
 mr_autophaser.py
 (c) 2023 Mark Brooks
 Takes 1 or more input pdb files, performs molecular replacement 
-using a given MTZ file
-ccp4-python ./mr_autophaser.py -m test/beta_blip.mtz -1 test/beta.pdb -2 test/blip.pdb
+    using a given MTZ file
+    ccp4-python ./mr_autophaser.py -m test/beta_blip.mtz -1 test/beta.pdb -2 test/blip.pdb
 """
-import sys
+import os, sys
 from pathlib import Path
 from time import strftime
 import logging
@@ -20,9 +20,9 @@ __version__ = "0.1.0"
 __program__ = "mr_autophaser"
 __author__ = "Mark Brooks, based on phaser tutorial scripts"
 __synopsis__ = """This script takes 1 or more input pdb files, performing molecular
-replacement using a given MTZ file 
-example usage:
-ccp4-python ./mr_autophaser.py -m test/beta_blip.mtz -1 test/beta.pdb -2 test/blip.pdb
+    replacement using a given MTZ file 
+    example usage:
+    ccp4-python ./mr_autophaser.py -m test/beta_blip.mtz -1 test/beta.pdb -2 test/blip.pdb
 """
 
 def parse_args():
@@ -34,6 +34,7 @@ def parse_args():
     if len(sys.argv[1:]) == 0:
         print("No argument given!")
         parser.print_help()
+        sys.exit(-1)
     parser.add_argument(
         "-m", "--mtz_input", dest="mtzin", help="MTZ input file", metavar="mtzin"
     )

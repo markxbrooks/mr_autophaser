@@ -1,15 +1,16 @@
 #!/usr/bin/env ccp4-python
 """
 mr_autophaser.py
-(c) 2022 Mark Brooks
+(c) 2023 Mark Brooks
 Takes 1 or more input pdb files, performs molecular replacement 
 using a given MTZ file
 """
 from phaser import *
 #from StringIO import *
+import os, sys
+from pathlib import Path
 import re
 import argparse
-import os,sys
 from Bio.PDB import PDBParser, PPBuilder
 from Bio.SeqUtils import seq1
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
@@ -62,7 +63,7 @@ def main(args):
         rootname = ""
         for pdb, num in pdb_list.items():
             if pdb:
-                fileroot = re.sub(".pdb", "", pdb, re.IGNORECASE)
+                fileroot = Path(pdb).stem
                 if rootname == "":
                     rootname = fileroot    
                 else:    
@@ -70,7 +71,7 @@ def main(args):
                 phaser_input.addENSE_PDB_ID(pdb, pdb,1.0)
                 pdbparser = PDBParser(QUIET=True)
                 if CHAIN:
-                    structure = pdbparsephaser_result.get_structure(pdb, pdb)
+                    structure = pdbparser.get_structure(pdb, pdb)
                     chains = {chain.id:seq1(''.join(residue.resname for residue in chain)) for chain in structure.get_chains()}
                     query_chain = chains[CHAIN]
                     # print(query_chain)
@@ -78,7 +79,7 @@ def main(args):
                     mwt = prot_param.molecular_weight()
                     print(f">{fileroot}")
                     print((query_chain))
-                    print("Molecular weight of " + pdb + " Chain '" + CHAIN + "': %0.2f Da" % mwt)
+                    print(f"Molecular weight of {pdb} Chain {CHAIN}: {mwt:0.2f} Da")
                 else:
                     structure = pdbparser.get_structure(pdb, pdb)
                     pdbb = PPBuilder()

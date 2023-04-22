@@ -11,7 +11,6 @@ from pathlib import Path
 import argparse
 from phaser import *
 from Bio.PDB import PDBParser, PPBuilder
-from Bio.SeqUtils import seq1
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
 __version__ = "0.1.0"

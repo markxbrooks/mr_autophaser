@@ -29,8 +29,6 @@ optional arguments:
                         -num_pdb3, default is 1
 ```
 
-```
-
 Unit test
 
 ```

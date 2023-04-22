@@ -4,6 +4,7 @@ mr_autophaser.py
 (c) 2023 Mark Brooks
 Takes 1 or more input pdb files, performs molecular replacement 
 using a given MTZ file
+ccp4-python ./mr_autophaser.py -m test/beta_blip.mtz -1 test/beta.pdb -2 test/blip.pdb
 """
 from phaser import *
 #from StringIO import *

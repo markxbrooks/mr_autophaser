@@ -14,6 +14,7 @@ import argparse
 from phaser import *
 from Bio.PDB import PDBParser, PPBuilder
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
+from utils import print_header
 
 __version__ = "0.1.0"
 __program__ = "mr_autophaser"
@@ -83,12 +84,15 @@ def parse_args():
 
 def main(args):
     """
+    Set up logging
+    Parse arguments
     Perform molecular replacement
     @param args
     """
+    print_header(__program__, __author__, __version__, __synopsis__)
     timestamp = strftime("%H_%M_%m_%d_%Y")
     log_filename = f"logs/{__program__}_{timestamp}.log"
-    print(f{Saving logs to: {log_filename}})
+    print(f"Saving logs to: {log_filename}")
     logging.basicConfig(
         filename=log_filename,
         filemode="w",
@@ -102,6 +106,15 @@ def main(args):
         args.PDBIN2: args.NUMBER2,
         args.PDBIN3: args.NUMBER3,
     }
+    mr_auto(mtzin, pdb_list, chain)
+
+def mr_auto(mtzin, pdb_list, chain=None):
+    """
+    @synopsis perform molecular replacement 
+    @param pdb_list dictionary of pdb files and the number of copies of each expected in the unit cell 
+    @param chain string chain of interest
+    @return True on success
+    """
     phaser_input = InputMR_DAT()
     phaser_input.setHKLI(mtzin)
     phaser_input.setMUTE(True)
@@ -155,18 +168,23 @@ def main(args):
                 print(
                     f"Phaser has found {str(phaser_result.numSolutions())} MR solutions"
                 )
-                print(f"Top LLG = {phaser_result.getTopLLG()}")
-                print(f"Top TFZ = {phaser_result.getTopTFZ()}")
+                print(f"Top LLG = {phaser_result.getTopLLG():0.2f}")
+                print(f"Top TFZ = {phaser_result.getTopTFZ():0.2f}")
                 print(f"Top PDB file = {phaser_result.getTopPdbFile()}")
+                return True
             else:
                 print("Phaser has not found any MR solutions")
+                return False
         else:
             print("Job exit status FAILURE")
             print(phaser_result.ErrorName(), "ERROR: ", phaser_result.ErrorMessage())
+            return False
     else:
         print("Job exit status FAILURE")
         print(phaser_result.ErrorName(), "ERROR: ", phaser_result.ErrorMessage())
+        return False    
     logging.info(phaser_result.logfile())
+
 if __name__ == "__main__":
     args = parse_args()
     main(args)

@@ -8,6 +8,8 @@ ccp4-python ./mr_autophaser.py -m test/beta_blip.mtz -1 test/beta.pdb -2 test/bl
 """
 import sys
 from pathlib import Path
+from time import strftime
+import logging
 import argparse
 from phaser import *
 from Bio.PDB import PDBParser, PPBuilder
@@ -84,6 +86,15 @@ def main(args):
     Perform molecular replacement
     @param args
     """
+    timestamp = strftime("%H_%M_%m_%d_%Y")
+    log_filename = f"logs/{__program__}_{timestamp}.log"
+    print(f{Saving logs to: {log_filename}})
+    logging.basicConfig(
+        filename=log_filename,
+        filemode="w",
+        format='%(asctime)s,%(msecs)d %(levelname)-8s [%(pathname)s:%(lineno)d in function %(funcName)s] %(message)s',
+        level=logging.DEBUG,
+    )
     chain = args.chain
     mtzin = args.mtzin
     pdb_list = {
@@ -95,7 +106,7 @@ def main(args):
     phaser_input.setHKLI(mtzin)
     phaser_input.setMUTE(True)
     phaser_result = runMR_DAT(phaser_input)
-    # print(phaser_result.logfile())
+    logging.info(phaser_result.logfile())
     print("Running MR Auto-Phaser...")
     if phaser_result.Success():
         phaser_input = InputMR_AUTO()
@@ -155,7 +166,7 @@ def main(args):
     else:
         print("Job exit status FAILURE")
         print(phaser_result.ErrorName(), "ERROR: ", phaser_result.ErrorMessage())
-
+    logging.info(phaser_result.logfile())
 if __name__ == "__main__":
     args = parse_args()
     main(args)

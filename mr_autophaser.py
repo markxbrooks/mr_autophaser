@@ -1,76 +1,96 @@
-#!/usr/bin/env python
-from pathlib import Path
+#!/usr/bin/env ccp4-python
+"""
+mr_autophaser.py
+(c) 2023 Mark Brooks
+Takes 1 or more input pdb files, performs molecular replacement 
+using a given MTZ file
+"""
+import os,sys
+import re
 from phaser import *
-import argparse
-from Bio.PDB import PDBParser, PPBuilder
-from Bio import SeqIO
+from StringIO import *
+from optparse import OptionParser
+from Bio.PDB import PDBParser
+from Bio.SeqUtils import seq1
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-m", "--mtz", metavar="mtz", help="MTZ file of interest", type=str)
-parser.add_argument("-p", "--pdb1", metavar="pdb1", help="PDB file of interest 1", type=str)
-parser.add_argument("-q", "--pdb2", metavar="pdb2", help="PDB file of interest 2", type=str)
-args = parser.parse_args()
 
-p1_stem = Path(args.pdb1).stem
-p2_stem = Path(args.pdb2).stem
-
-p = PDBParser(QUIET=True)
-pdb1_structure = p.get_structure("pdb1", args.pdb1)
-ppb1 = PPBuilder()
-for pp1 in ppb1.build_peptides(pdb1_structure):
-    record1_str = pp1.get_sequence().__str__()
-    
-pdb2_structure = p.get_structure("pdb2", args.pdb2)
-ppb2 = PPBuilder()
-for pp2 in ppb2.build_peptides(pdb2_structure):
-    record2_str = pp2.get_sequence().__str__()
-    
-print(f">{p1_stem}")
-print(record1_str)
-print(f">{p2_stem}")
-print(record2_str)
-
-p1_analysis = ProteinAnalysis(str(record1_str))
-p1_mr = p1_analysis.molecular_weight()
-
-p2_analysis = ProteinAnalysis(str(record2_str))
-p2_mr = p2_analysis.molecular_weight()
-
-print(f"{p1_stem} pdb1 mr: {p1_mr:.1f} Da")
-print(f"{p2_stem} pdb2 mr: {p2_mr:.1f} Da")
-
-i = InputMR_DAT()
-i.setHKLI(args.mtz)
-i.setLABI_F_SIGF("Fobs","Sigma")
-i.setHIRES(6.0)
-i.setMUTE(True)
-r = runMR_DAT(i)
-if r.Success():
-    i = InputMR_AUTO()
-    i.setSPAC_HALL(r.getSpaceGroupHall())
-    i.setCELL6(r.getUnitCell())
-    i.setREFL_F_SIGF(r.getMiller(),r.getFobs(),r.getSigFobs())
-    i.setROOT("beta_blip_auto")
-    i.addENSE_PDB_ID("pdb1",args.pdb1,1.0)
-    i.addENSE_PDB_ID("pdb2",args.pdb2,1.0)
-    i.addCOMP_PROT_MW_NUM(p1_mr,1)
-    i.addCOMP_PROT_MW_NUM(p2_mr,1)
-    i.addSEAR_ENSE_NUM("pdb1",1)
-    i.addSEAR_ENSE_NUM("pdb2",1)
+def main(options, args):
+    CHAIN = options.CHAIN
+    MTZIN = options.MTZIN
+    pdb_list = {options.PDBIN1: options.NUMBER1, 
+            options.PDBIN2: options.NUMBER2, 
+            options.PDBIN3: options.NUMBER3}
+    i = InputMR_DAT()
+    i.setHKLI(MTZIN)
     i.setMUTE(True)
-    del(r)
-    r = runMR_AUTO(i)
+    r = runMR_DAT(i)
+    # print(r.logfile())
+    print("Running MR Auto-Phaser...")
     if r.Success():
-        if r.foundSolutions() :
-            print("Phaser has found MR solutions")
-            print("Top LLG = %f" % r.getTopLLG())
-            print("Top PDB file = %s" % r.getTopPdbFile())
+        i = InputMR_AUTO()
+        i.setREFL_DATA(r.getREFL_DATA())
+        rootname = ""
+        for pdb, num in pdb_list.items():
+            if pdb:
+                fileroot = re.sub(".pdb", "", pdb, re.IGNORECASE)
+                if rootname == "":
+                    rootname = fileroot    
+                else:    
+                    rootname = fileroot + "_" + rootname
+                i.addENSE_PDB_ID(pdb, pdb,1.0)
+                pdbparser = PDBParser(QUIET=True)
+                structure = pdbparser.get_structure(pdb, pdb)
+                chains = {chain.id:seq1(''.join(residue.resname for residue in chain)) for chain in structure.get_chains()}
+                # print("Chains: " + str(chains))
+                query_chain = chains[CHAIN]
+                # print(query_chain)
+                prot_param = ProteinAnalysis(query_chain)
+                mwt = prot_param.molecular_weight()
+                print("Molecular weight of " + pdb + " Chain '" + CHAIN + "': %0.2f Da" % mwt)
+                i.addCOMP_PROT_MW_NUM(mwt,int(num))
+                i.addSEAR_ENSE_NUM(pdb,int(num))
+        i.setROOT(rootname)
+        i.setMUTE(True)
+        del(r)
+        r = runMR_AUTO(i)
+        if r.Success():
+            if r.foundSolutions() :
+                print("Phaser has found " + str(r.numSolutions()) + " MR solutions")
+                print("Top LLG = %f" % r.getTopLLG())
+                print("Top TFZ = %f" % r.getTopTFZ())
+                print("Top PDB file = %s" % r.getTopPdbFile())
+            else:
+                print("Phaser has not found any MR solutions")
         else:
-            print("Phaser has not found any MR solutions")
+            print("Job exit status FAILURE")
+            print(r.ErrorName(), "ERROR: ", r.ErrorMessage())
     else:
         print("Job exit status FAILURE")
-        print(r.ErrorName(), "ERROR :", r.ErrorMessage())
-else:
-    print("Job exit status FAILURE")
-    print(r.ErrorName(), "ERROR :", r.ErrorMessage())
+        print(r.ErrorName(), "ERROR: ", r.ErrorMessage())
+
+if __name__ == '__main__':
+    usage = 'This script takes 1 or more input pdb files, performing molecular replacement using a given MTZ file \n./mr_autophaser.py -m beta_blip_P3221.mtz -1 beta.pdb -2 blip.pdb -c " "'
+    parser = OptionParser(usage=usage)
+    parser.add_option("-m", "--mtz_input", dest="MTZIN",
+                      help="MTZ input file", metavar="MTZIN")
+    parser.add_option("-1", "--pdb_input1", dest="PDBIN1",
+                      help="pdb input file", metavar="PDBIN1")
+    parser.add_option("-2", "--pdb_input2", dest="PDBIN2",
+                      help="pdb input file", metavar="PDBIN2")
+    parser.add_option("-3", "--pdb_input3", dest="PDBIN3",
+                      help="pdb input file3", metavar="PDBIN3")
+    parser.add_option("-c", "--chain", dest="CHAIN",
+                      help="chain name, e.g. 'A','C',' ' Default is 'A'", metavar="CHAIN", default="A")
+    parser.add_option("-n", "--num_pdb1", dest="NUMBER1",
+                      help="-num_pdb1, default is 1", metavar="NUMBER1", default=1)
+    parser.add_option("-o", "--num_pdb2", dest="NUMBER2",
+                      help="-num_pdb2, default is 1", metavar="NUMBER2", default=1)
+    parser.add_option("-p", "--num_pdb3", dest="NUMBER3",
+                      help="-num_pdb3, default is 1", metavar="NUMBER3", default=1)
+    (options, args) = parser.parse_args()
+    if len(sys.argv[1:]) == 0:
+        print "No argument given!"
+        parser.print_help()
+    else:    
+        main(options, args)
